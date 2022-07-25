@@ -21,5 +21,5 @@ AWS SageMaker has a fantastic set of functional components that can be used in c
     
 ## Installation
 ```
-pip install sandbox
+pip install sagesand
 ```

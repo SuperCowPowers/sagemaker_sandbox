@@ -16,9 +16,9 @@ def get_files(dir_name):
 
 
 setup(
-    name='sandbox',
+    name='sagesand',
     # use_scm_version=True,
-    version='0.1.2',
+    version='0.1.0',
     description='SageMaker Sandbox',
     long_description=readme,
     long_description_content_type='text/markdown',
