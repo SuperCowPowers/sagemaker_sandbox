@@ -68,7 +68,7 @@ class FeatureSpider:
         for pred, knn_pred, str_val_list, str_dist_list in zip(model_preds, knn_preds, target_values, distances):
             # Each of these is a string of a list (yes a bit cheesy)
             vals = [float(val) for val in str_val_list.split(', ')]
-            dist = [float(dis) for dis in str_dist_list.split(', ')]
+            _ = [float(dis) for dis in str_dist_list.split(', ')]  # dist current not used
 
             # Compute stddev of the target values
             knn_stddev = np.std(vals)
@@ -85,7 +85,7 @@ class FeatureSpider:
         # Return the confidence scores
         return confidence_scores
 
-    def neighbor_info(self, pred_df) -> pd.DataFrame | None:
+    def neighbor_info(self, pred_df) -> pd.DataFrame:
         """Provide information on the neighbors (prediction, knn_target_values, knn_distances)"""
 
         # Make sure we have all the features
@@ -186,7 +186,8 @@ class FeatureSpider:
         return list(high_gradient_indexes)
 
 
-if __name__ == '__main__':
+def test():
+    """Test for the Feature Spider Class"""
     # Make some fake data
     data = {'ID': ['IVC-123-1', 'IVC-124-1', 'IVC-125-1', 'IVC-125-2', 'IVC-126-1'],
             'SMILES': ['CC1(C)[C@@H]2C[C@H]1C2(C)C',
@@ -210,3 +211,7 @@ if __name__ == '__main__':
     high_gradients = f_spider.high_gradients(2, 2)
     print('\nHIGH GRADIENTS')
     print(high_gradients)
+
+
+if __name__ == '__main__':
+    test()

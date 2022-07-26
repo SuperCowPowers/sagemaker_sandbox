@@ -119,7 +119,9 @@ class RowTagger:
             self.df['tags'].iloc[index].append('htg')
 
 
-if __name__ == '__main__':
+def test():
+    """Test for the RowTagger Class"""
+
     # Set some pandas options
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 1000)
@@ -145,3 +147,7 @@ if __name__ == '__main__':
     row_tagger = RowTagger(data_df, my_features)
     data_df = row_tagger.tag_rows()
     print(data_df)
+
+
+if __name__ == '__main__':
+    test()
