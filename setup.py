@@ -32,6 +32,8 @@ setup(
     data_files=get_files('data') + get_files('examples'),
     install_requires=[
         'sagemaker',
+        'pandas',
+        'scikit-learn'
     ],
     license='Apache License 2.0',
     keywords='SageMaker, Machine Learning, AWS, Python, Utilities',
