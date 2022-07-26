@@ -53,6 +53,7 @@ If ALL the test above pass\...
 
 ``` {.bash}
 $ vi setup.py and bump the version
+$ make clean
 $ python setup.py sdist bdist_wheel
 $ twine upload dist/* -r testpypi
 ```
