@@ -9,7 +9,7 @@ from sklearn.preprocessing import StandardScaler
 
 # Feature Spider Class
 class FeatureSpider:
-    def __init__(self, df, features: list, target: str):
+    def __init__(self, df: pd.DataFrame, features: list, target: str):
 
         # Check for expected columns (used later)
         for column in ['ID', 'SMILES', target]:
@@ -41,11 +41,11 @@ class FeatureSpider:
         """Return the KNN Model Internal Feature Matrix"""
         return self.knn._fit_X
 
-    def predict(self, pred_df) -> list:
+    def predict(self, pred_df: pd.DataFrame) -> list:
         """Provide a prediction from the KNN Pipeline model (knn_prediction)"""
         return self.pipe.predict(pred_df[self.features])
 
-    def confidence_scores(self, pred_df, model_preds=None) -> list:
+    def confidence_scores(self, pred_df: pd.DataFrame, model_preds=None) -> list:
         """Compute Confidence Scores for each Prediction"""
 
         # Get all the KNN information relevant to this calculation
@@ -85,7 +85,7 @@ class FeatureSpider:
         # Return the confidence scores
         return confidence_scores
 
-    def neighbor_info(self, pred_df) -> pd.DataFrame:
+    def neighbor_info(self, pred_df: pd.DataFrame) -> pd.DataFrame:
         """Provide information on the neighbors (prediction, knn_target_values, knn_distances)"""
 
         # Make sure we have all the features
@@ -132,7 +132,7 @@ class FeatureSpider:
         """Convenience method that calls high_gradients with a distance of 0"""
         return self.high_gradients(0.0, target_diff, verbose)
 
-    def high_gradients(self, within_distance, target_diff, verbose=True) -> list:
+    def high_gradients(self, within_distance: float, target_diff: float, verbose: bool = True) -> list:
         # This basically loops over all the X features in the KNN model
         # - Grab the neighbors distances and indices
         # - For neighbors `within_distance`* grab target values
@@ -175,11 +175,11 @@ class FeatureSpider:
                     # Print out the info about both observations
                     if verbose:
                         print(f"\nFeature Dist: {dist}: logS Diff: {logs_diff:.2f}")
-                        source = self.df.iloc[my_index]['Source'] if self.source else 'No Source'
+                        source = self.df.iloc[my_index]['Source'] if self.source is not None else 'No Source'
                         print(f"{my_id}({my_target:.2f}): {my_smile} {source}")
                         neighbor_id = self.df.iloc[n_index]['ID']
                         neighbor_smile = self.df.iloc[n_index]['SMILES']
-                        n_source = self.df.iloc[n_index]['Source'] if self.source else 'No Source'
+                        n_source = self.df.iloc[n_index]['Source'] if self.source is not None else 'No Source'
                         print(f"{neighbor_id}({target:.2f}): {neighbor_smile} {n_source}")
 
         # Return the full list of indexes that are part of high gradient pairs

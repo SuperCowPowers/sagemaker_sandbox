@@ -17,7 +17,7 @@ class RowTagger:
         - High Target Gradient (HTG) Neighborhood
         - Activity Cliff Group Candidate (subset of HTG with additional Logic)"""
 
-    def __init__(self, dataframe: pd.DataFrame, features: list, min_dist=2.0, min_target_diff=1.0):
+    def __init__(self, dataframe: pd.DataFrame, features: list, min_dist: float = 2.0, min_target_diff: float = 1.0):
         # Do a validation check on the dataframe
         self.df = dataframe
         self.validate_input_data()
@@ -31,7 +31,7 @@ class RowTagger:
 
         # Add a 'tags' column (if it doesn't already exist)
         if 'tags' not in self.df.columns:
-            self.df['tags'] = [[] for _ in range(len(self.df.index))]
+            self.df['tags'] = [set() for _ in range(len(self.df.index))]
 
     def validate_input_data(self):
         # Make sure it's a dataframe
@@ -84,7 +84,7 @@ class RowTagger:
             if len(index_list) > 1:
                 # LOC uses the index ^label^ (which is what we want)
                 for index in index_list:
-                    self.df['tags'].loc[index].append('stereo_isomer')
+                    self.df['tags'].loc[index].add('stereo_isomer')
 
     def replicants(self):
         """Tag all the ID strings that represents a replicant experiment"""
@@ -99,7 +99,7 @@ class RowTagger:
             if len(index_list) > 1:
                 # LOC uses the index ^label^ (which is what we want)
                 for index in index_list:
-                    self.df['tags'].loc[index].append('replicant')
+                    self.df['tags'].loc[index].add('replicant')
 
     def coincident(self):
         """Find observations with the SAME features that have different target values"""
@@ -107,7 +107,7 @@ class RowTagger:
 
         # We get back index offsets (not labels) so we need to use iloc
         for index in coincident_indexes:
-            self.df['tags'].iloc[index].append('coincident')
+            self.df['tags'].iloc[index].add('coincident')
 
     def high_gradients(self):
         """Find observations close in feature space with a high difference in target values
@@ -116,7 +116,7 @@ class RowTagger:
 
         # We get back index offsets (not labels) so we need to use iloc
         for index in htg_indexes:
-            self.df['tags'].iloc[index].append('htg')
+            self.df['tags'].iloc[index].add('htg')
 
 
 def test():
