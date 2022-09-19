@@ -9,22 +9,23 @@ from sklearn.preprocessing import StandardScaler
 
 # Feature Spider Class
 class FeatureSpider:
-    def __init__(self, df: pd.DataFrame, features: list, target: str):
+    def __init__(self, df: pd.DataFrame, features: list, id_column: str, target: str, source: str):
 
         # Check for expected columns (used later)
-        for column in ['ID', 'SMILES', target]:
+        for column in ['SMILES', id_column, target, source]:
             if column not in df.columns:
                 print(f'DataFrame does not have required {column} Column!')
                 return
 
         # Set internal vars that are used later
         self.df = df
-        self.features = features
+        self.id_column = id_column
         self.target = target
-        self.source = df['Source'].values if 'Source' in df else None
+        self.source = source
+        self.features = features
 
         # Build our KNN model pipeline with StandardScalar
-        knn = KNeighborsRegressor(n_neighbors=5, weights='distance')
+        knn = KNeighborsRegressor(n_neighbors=10, weights='distance')
         self.pipe = make_pipeline(StandardScaler(), knn)
 
         # Fit Model on features and target
@@ -110,7 +111,9 @@ class FeatureSpider:
 
         # Do we have Source data
         if self.source is not None:
-            results_df['sources'] = [self.source[index] for index in neigh_ind]
+            for index in neigh_ind:
+                print(self.df.iloc[index][self.source])
+            results_df['sources'] = [', '.join([self.df.iloc[index][self.source][0] for index in neigh_ind])]
         return results_df
 
     def neighbor_ids(self, pred_df) -> pd.DataFrame:
@@ -124,7 +127,7 @@ class FeatureSpider:
 
         # Neighbor ID/SMILE lookups
         neigh_dist, neigh_ind = self.knn.kneighbors(x_scaled)
-        results_df['knn_ids'] = [', '.join(self.df.iloc[index]['ID'] for index in indexes) for indexes in neigh_ind]
+        results_df['knn_ids'] = [', '.join(self.df.iloc[index][self.id_column] for index in indexes) for indexes in neigh_ind]
         results_df['knn_smiles'] = [', '.join(self.df.iloc[index]['SMILES'] for index in indexes) for indexes in neigh_ind]
         return results_df
 
@@ -133,76 +136,90 @@ class FeatureSpider:
         return self.high_gradients(0.0, target_diff, verbose)
 
     def high_gradients(self, within_distance: float, target_diff: float, verbose: bool = True) -> list:
-        # This basically loops over all the X features in the KNN model
-        # - Grab the neighbors distances and indices
-        # - For neighbors `within_distance`* grab target values
-        # - If target values have a difference > `target_diff` (in our case logS Mol(-1))
-        #     - List out the details of the observations and the distance, target diff
-        #
-        # *standarized feature space
-        high_gradient_indexes = set()
+        """This basically loops over all the X features in the KNN model
+           - Grab the neighbors distances and indices
+           - For neighbors `within_distance`* grab target values
+           - If target values have a difference > `target_diff`
+              - List out the details of the observations and the distance, target diff
+           *Note: standardized feature space
+        """
+        global_htg_set = set()
         for my_index, obs in enumerate(self.knn._fit_X):
             neigh_distances, neigh_indexes = self.knn.kneighbors([obs])
-            neigh_distances = neigh_distances[0]  # Just ONE observation
-            neigh_indexes = neigh_indexes[0]  # Just ONE observation
+            neigh_distances = neigh_distances[0]  # Returns a list within a list so grab the inner list
+            neigh_indexes = neigh_indexes[0]  # Returns a list within a list so grab the inner list
             target_values = self.knn._y[neigh_indexes]
 
             # Grab the info for this observation
-            my_id = self.df.iloc[my_index]['ID']
+            my_id = self.df.iloc[my_index][self.id_column]
             my_smile = self.df.iloc[my_index]['SMILES']
             my_target = self.knn._y[my_index]
 
             # Loop through the neighbors
             # Note: by definition this observation will be in the neighbors so account for that
+            my_htg_set = set()
             for n_index, dist, target in zip(neigh_indexes, neigh_distances, target_values):
 
                 # Skip myself
                 if n_index == my_index:
                     continue
 
-                # Lower diagonal
-                if n_index < my_index:
-                    continue
+                # Compute target differences `within_distance` feature space
+                _diff = abs(my_target - target)
+                if dist <= within_distance and _diff > target_diff:
 
-                # Compute logS differences `within_distance` feature space
-                logs_diff = abs(my_target - target)
-                if dist <= within_distance and logs_diff > target_diff:
+                    # Update the individual HTG set for this observation
+                    my_htg_set.add((n_index, dist, _diff, target))
 
-                    # Add these observations (rows) to high gradient index list
-                    high_gradient_indexes.add(my_index)
-                    high_gradient_indexes.add(n_index)
+                    # Add both (me and my neighbor) to the global high gradient index list
+                    global_htg_set.add(my_index)
+                    global_htg_set.add(n_index)
 
-                    # Print out the info about both observations
-                    if verbose:
-                        print(f"\nFeature Dist: {dist}: logS Diff: {logs_diff:.2f}")
-                        source = self.df.iloc[my_index]['Source'] if self.source is not None else 'No Source'
-                        print(f"{my_id}({my_target:.2f}): {my_smile} {source}")
-                        neighbor_id = self.df.iloc[n_index]['ID']
-                        neighbor_smile = self.df.iloc[n_index]['SMILES']
-                        n_source = self.df.iloc[n_index]['Source'] if self.source is not None else 'No Source'
-                        print(f"{neighbor_id}({target:.2f}): {neighbor_smile} {n_source}")
+            # Okay we've computed our HTG set for this observation
+            # Print out all my HTG neighbors if the verbose flag is set
+            if verbose and my_htg_set:
+                source = self.df.iloc[my_index][self.source]
+                print(f"\nOBSERVATION: {my_id}")
+                print(f"\t{my_id}({my_target:.2f}):{my_smile} {source}")
+                for htg_neighbor, dist, _diff, target in my_htg_set:
+                    neighbor_id = self.df.iloc[htg_neighbor][self.id_column]
+                    neighbor_smile = self.df.iloc[htg_neighbor]['SMILES']
+                    n_source = self.df.iloc[htg_neighbor][self.source]
+                    print(f"\t{neighbor_id}({target:.2f}):{neighbor_smile} {n_source} TD:{_diff:.2f} FD:{dist}")
 
-        # Return the full list of indexes that are part of high gradient pairs
-        return list(high_gradient_indexes)
+        # Return the global list of indexes that are part of high target gradient (HTG) pairs
+        return list(global_htg_set)
 
 
 def test():
     """Test for the Feature Spider Class"""
+    # Set some pandas options
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', 1000)
+
     # Make some fake data
-    data = {'ID': ['IVC-123-1', 'IVC-124-1', 'IVC-125-1', 'IVC-125-2', 'IVC-126-1'],
+    data = {'ID': ['IVC-0', 'IVC-1', 'IVC-2', 'IVC-3', 'IVC-4',
+                   'IVC-5', 'IVC-6', 'IVC-7', 'IVC-8', 'IVC-9'],
             'SMILES': ['CC1(C)[C@@H]2C[C@H]1C2(C)C',
                        'CC1(C)[C@H]2C[C@@H]1C2(C)C',
                        'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
                        'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
-                       'CC(C)[C@@H]1CC[C@@H](C)C[C@H]1OC(=O)[C@H](C)O'],
-            'feat1': [1.0, 1.0, 1.1, 3.0, 4.0],
-            'feat2': [1.0, 1.0, 1.1, 3.0, 4.0],
-            'feat3': [0.1, 0.1, 0.2, 1.6, 2.5],
-            'logS': [-3.1, -6.0, -6.0, -4.0, -2.0]}
+                       'CC(C)[C@@H]1CC[C@@H](C)C[C@H]1OC(=O)[C@H](C)O',
+                       'CC1(C)[C@@H]2C[C@H]1C2(C)C',
+                       'CC1(C)[C@H]2C[C@@H]1C2(C)C',
+                       'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
+                       'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
+                       'CC(C)[C@@H]1CC[C@@H](C)C[C@H]1OC(=O)[C@H](C)O'
+                       ],
+            'feat1': [1.0, 1.0, 1.1, 3.0, 4.0, 1.0, 1.0, 1.1, 3.0, 4.0],
+            'feat2': [1.0, 1.0, 1.1, 3.0, 4.0, 1.0, 1.0, 1.1, 3.0, 4.0],
+            'feat3': [0.1, 0.1, 0.2, 1.6, 2.5, 0.1, 0.1, 0.2, 1.6, 2.5],
+            'source': ['A', 'A', 'B', 'A', 'B', 'A', 'A', 'B', 'A', 'B'],
+            'logS': [-3.1, -6.0, -6.0, -4.0, -2.0, -3.1, -6.0, -6.0, -4.0, -2.0]}
     data_df = pd.DataFrame(data)
 
     # Create the class and run the taggers
-    f_spider = FeatureSpider(data_df, ['feat1', 'feat2', 'feat3'], 'logS')
+    f_spider = FeatureSpider(data_df, ['feat1', 'feat2', 'feat3'], id_column='ID', target='logS', source='source')
     preds = f_spider.predict(data_df)
     print(preds)
     coincident = f_spider.coincident(2)
@@ -211,6 +228,10 @@ def test():
     high_gradients = f_spider.high_gradients(2, 2)
     print('\nHIGH GRADIENTS')
     print(high_gradients)
+
+    # Run some neighbor methods
+    query_df = data_df[data_df['ID'] == 'IVC-0'].copy()
+    print(f_spider.neighbor_info(query_df))
 
 
 if __name__ == '__main__':
