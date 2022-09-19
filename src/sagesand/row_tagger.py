@@ -17,17 +17,21 @@ class RowTagger:
         - High Target Gradient (HTG) Neighborhood
         - Activity Cliff Group Candidate (subset of HTG with additional Logic)"""
 
-    def __init__(self, dataframe: pd.DataFrame, features: list, min_dist: float = 2.0, min_target_diff: float = 1.0):
+    def __init__(self, dataframe: pd.DataFrame, features: list, id_column: str, target: str,
+                 source: str, min_dist: float, min_target_diff: float):
+
+        # Set up some parameters
+        self.id_column = id_column
+        self.min_dist = min_dist
+        self.min_target_diff = min_target_diff
+
         # Do a validation check on the dataframe
         self.df = dataframe
         self.validate_input_data()
 
         # We need the feature spider for the more advanced tags
-        self.f_spider = feature_spider.FeatureSpider(self.df, features, 'logS')
-
-        # Set up some parameters
-        self.min_dist = min_dist
-        self.min_target_diff = min_target_diff
+        self.f_spider = feature_spider.FeatureSpider(self.df, features, id_column=self.id_column,
+                                                     target=target, source=source)
 
         # Add a 'tags' column (if it doesn't already exist)
         if 'tags' not in self.df.columns:
@@ -52,7 +56,7 @@ class RowTagger:
         if 'SMILES' not in self.df.columns:
             print('Input DataFrame needs a SMILES column!')
             return False
-        if 'ID' not in self.df.columns:
+        if self.id_column not in self.df.columns:
             print('Input DataFrame needs a ID column!')
             return False
 
@@ -127,24 +131,29 @@ def test():
     pd.set_option('display.width', 1000)
 
     # Make some fake data
-    data = {'ID': ['IVC-123-1', 'IVC-124-1', 'IVC-125-1', 'IVC-125-2', 'IVC-126-1'],
+    data = {'ID': ['IVC-0-1', 'IVC-1-1', 'IVC-1-2', 'IVC-3-1', 'IVC-4-1',
+                   'IVC-5-1', 'IVC-6-1', 'IVC-6-2', 'IVC-8-1', 'IVC-9-1'],
             'SMILES': ['CC1(C)[C@@H]2C[C@H]1C2(C)C',
                        'CC1(C)[C@H]2C[C@@H]1C2(C)C',
                        'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
                        'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
-                       'CC(C)[C@@H]1CC[C@@H](C)C[C@H]1OC(=O)[C@H](C)O'],
-            'feat1': [1.0, 1.0, 1.1, 3.0, 4.0],
-            'feat2': [1.0, 1.0, 1.1, 3.0, 4.0],
-            'feat3': [0.1, 0.1, 0.2, 1.6, 2.5],
-            'logS': [-2.9, -4.0, -3.5, -3.4, -2.2]}
+                       'CC(C)[C@@H]1CC[C@@H](C)C[C@H]1OC(=O)[C@H](C)O',
+                       'CC1(C)[C@@H]2C[C@H]1C2(C)C',
+                       'CC1(C)[C@H]2C[C@@H]1C2(C)C',
+                       'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
+                       'C[C@]12O[C@H]1C[C@H]1C[C@@H]2C1(C)C',
+                       'CC(C)[C@@H]1CC[C@@H](C)C[C@H]1OC(=O)[C@H](C)O'
+                       ],
+            'feat1': [1.0, 1.0, 1.1, 3.0, 4.0, 1.0, 1.0, 1.1, 3.0, 4.0],
+            'feat2': [1.0, 1.0, 1.1, 3.0, 4.0, 1.0, 1.0, 1.1, 3.0, 4.0],
+            'feat3': [0.1, 0.1, 0.2, 1.6, 2.5, 0.1, 0.1, 0.2, 1.6, 2.5],
+            'source': ['A', 'A', 'B', 'A', 'B', 'A', 'A', 'B', 'A', 'B'],
+            'logS': [-3.1, -6.0, -6.0, -4.0, -2.0, -3.1, -6.0, -6.0, -4.0, -2.0]}
     data_df = pd.DataFrame(data)
 
-    # Features that are used internally (feature spider)
-    meta = ['ID', 'logS', 'SMILES', 'Replicates', 'StdDev', 'Source']
-    my_features = list(set(data_df.columns) - set(meta))
-
     # Create the class and run the taggers
-    row_tagger = RowTagger(data_df, my_features)
+    row_tagger = RowTagger(data_df, ['feat1', 'feat2', 'feat3'], id_column='ID', target='logS', source='source',
+                           min_dist=2.0, min_target_diff=1.0)
     data_df = row_tagger.tag_rows()
     print(data_df)
 
